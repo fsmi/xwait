@@ -1,0 +1,17 @@
+Source: xwait
+Section: x11
+Priority: extra
+Maintainer: Timo Weingärtner <timo@tiwe.de>
+Build-Depends: debhelper (>= 9), pandoc, libx11-dev
+Standards-Version: 3.9.5
+Homepage: https://github.com/tiwe-de/xwait
+Vcs-Git: git://github.com/tiwe-de/xwait.git -b debian
+Vcs-Browser: https://github.com/tiwe-de/xwait/tree/debian
+
+Package: xwait
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: wait for emerging X window
+ xwait waits for creation of any X window and optionally starts a command
+ after setting up the event filter. This can be useful for startup of X
+ sessions with some window managers.
