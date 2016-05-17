@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014, Fabian Stumpf <fb@fbcdn.com>
+ * Copyright (c) 2014, Fabian Stumpf <cb@cbcdn.com>
  * Copyright (c) 2014, Timo Weingärtner <timo@tiwe.de>
  *
  * Redistribution and use in source and binary forms, with or without
