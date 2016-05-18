@@ -27,10 +27,30 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sysexits.h>
+#include <stdbool.h>
+#include <string.h>
 #include <X11/Xlib.h>
 
+bool matchTitle(Display *display, Window w, char *title) {
+	char *result;
+	if (!title) {
+		return false;
+	}
+
+	if (!XFetchName(display, w, &result)) {
+		return false;
+	}
+
+	if (!result || strcmp(title, result) != 0) {
+		return false;
+	}
+
+	return true;
+}
+
+
 // chars should also be const, but see execvp(3p)
-int main(int const argc, char * const * const argv) {
+int main(int argc, char **argv) {
 	Display * dpy;
 	if (!(dpy = XOpenDisplay(NULL))) {
 		fprintf(stderr, "Failed to open display, is DISPLAY set?\n");
@@ -44,23 +64,43 @@ int main(int const argc, char * const * const argv) {
 	}
 
    	XSelectInput(dpy, w, SubstructureNotifyMask);
+	char *title = NULL;
+	argv++;
+	argc--;
+	for (; argc > 0 && argv != NULL && **argv == '-'; argv++, argc--) {
+		if (strcmp(*argv, "-title") == 0) {
+			argv++;
+			argc--;
+			title = *argv;
+			continue;
+		}
+		break;
+	}
 
-	if (argc > 1)
+	if (argc > 0) {
 		switch (fork()) {
 			case -1:
 				perror("fork");
 				exit(EX_UNAVAILABLE);
 			case 0:
-				execvp(argv[1], argv + 1);
+				execvp(argv[0], argv);
 				perror("execvp");
 				exit(EX_UNAVAILABLE);
 		}
+	}
 
 	XEvent event;
 	for (;;) {
 		XNextEvent(dpy, &event);
-		if (event.type == CreateNotify)
+		if (event.type == CreateNotify && !event.xcreatewindow.override_redirect) {
+			if (title) {
+				if (matchTitle(dpy, event.xcreatewindow.window, title)) {
+					break;
+				}
+				continue;
+			}
 			break;
+		}
 	}
 	
 	XCloseDisplay(dpy);
