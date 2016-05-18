@@ -22,6 +22,7 @@
 
 CFLAGS+=-std=c99
 LDLIBS=-lX11
+RM?=rm -f
 
 all: xwait.1 xwait
 
