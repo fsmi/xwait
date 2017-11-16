@@ -30,53 +30,97 @@
 #include <stdbool.h>
 #include <string.h>
 #include <X11/Xlib.h>
+#include <X11/Xutil.h>
 
-bool matchTitle(Display *display, Window w, char *title) {
-	char *result;
-	if (!title) {
+bool matchExtended(Display* display, Window w, char* class, char* title) {
+	char* result;
+	XClassHint class_hints;
+	bool rv = true;
+
+	//Sanity check
+	if (!title && !class) {
 		return false;
 	}
 
-	if (!XFetchName(display, w, &result)) {
-		return false;
+	if(title){
+		if (!XFetchName(display, w, &result) || !result) {
+			return false;
+		}
+
+		if (strcmp(title, result)) {
+			XFree(result);
+			return false;
+		}
+		XFree(result);
 	}
 
-	if (!result || strcmp(title, result) != 0) {
-		return false;
+	if(class){
+		if (!XGetClassHint(display, w, &class_hints) || !class_hints.res_class){
+			return false;
+		}
+
+		if (strcmp(class, class_hints.res_class)){
+			rv = false;
+		}
+
+		XFree(class_hints.res_name);
+		XFree(class_hints.res_class);
 	}
 
-	return true;
+	return rv;
 }
 
 
 // chars should also be const, but see execvp(3p)
 int main(int argc, char **argv) {
-	Display * dpy;
+	Display* dpy;
+	Window w;
+	char* title = NULL, *class = NULL;
+	int eventType = CreateNotify;
+
+	//Open X11 connection
 	if (!(dpy = XOpenDisplay(NULL))) {
 		fprintf(stderr, "Failed to open display, is DISPLAY set?\n");
 		exit(EX_UNAVAILABLE);
 	}
-	
-	Window w;
+
+	//Get the Root window to intercept global events
 	if (!(w = RootWindow(dpy, DefaultScreen(dpy)))) {
 		fprintf(stderr, "Root window could not be opened\n");
 		exit(EX_UNAVAILABLE);
 	}
 
+	//Select which events we want to handle
    	XSelectInput(dpy, w, SubstructureNotifyMask);
-	char *title = NULL;
+
+	//Skip argument 0
 	argv++;
 	argc--;
+
+	//Parse internal arguments
 	for (; argc > 0 && argv != NULL && **argv == '-'; argv++, argc--) {
-		if (strcmp(*argv, "-title") == 0) {
+		if (!strcmp(*argv, "-title")) {
 			argv++;
 			argc--;
 			title = *argv;
 			continue;
 		}
+
+		if (!strcmp(*argv, "-class")) {
+			argv++;
+			argc--;
+			class = *argv;
+			continue;
+		}
+
+		if (!strcmp(*argv, "-map")) {
+			eventType = MapNotify;
+			continue;
+		}
 		break;
 	}
 
+	//Execute additional program if requested
 	if (argc > 0) {
 		switch (fork()) {
 			case -1:
@@ -89,12 +133,17 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	//Wait for the requested event on the Root window
 	XEvent event;
 	for (;;) {
 		XNextEvent(dpy, &event);
-		if (event.type == CreateNotify && !event.xcreatewindow.override_redirect) {
-			if (title) {
-				if (matchTitle(dpy, event.xcreatewindow.window, title)) {
+		if (event.type == eventType
+				//Ignore modal windows
+				&& ((eventType == CreateNotify && !event.xcreatewindow.override_redirect)
+					|| (eventType == MapNotify && !event.xmap.override_redirect))) {
+			//Optionally, match window title and class
+			if (title || class) {
+				if (matchExtended(dpy, event.xcreatewindow.window, class, title)) {
 					break;
 				}
 				continue;
@@ -102,7 +151,7 @@ int main(int argc, char **argv) {
 			break;
 		}
 	}
-	
+
 	XCloseDisplay(dpy);
 	return 0;
 }
