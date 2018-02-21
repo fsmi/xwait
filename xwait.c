@@ -74,9 +74,10 @@ bool matchExtended(Display* display, Window w, char* class, char* title) {
 // chars should also be const, but see execvp(3p)
 int main(int argc, char **argv) {
 	Display* dpy;
-	Window w;
+	Window root, w = 0;
 	char* title = NULL, *class = NULL;
 	int eventType = CreateNotify;
+	bool print = false;
 
 	//Open X11 connection
 	if (!(dpy = XOpenDisplay(NULL))) {
@@ -85,13 +86,13 @@ int main(int argc, char **argv) {
 	}
 
 	//Get the Root window to intercept global events
-	if (!(w = RootWindow(dpy, DefaultScreen(dpy)))) {
+	if (!(root = RootWindow(dpy, DefaultScreen(dpy)))) {
 		fprintf(stderr, "Root window could not be opened\n");
 		exit(EX_UNAVAILABLE);
 	}
 
 	//Select which events we want to handle
-   	XSelectInput(dpy, w, SubstructureNotifyMask);
+   	XSelectInput(dpy, root, SubstructureNotifyMask);
 
 	//Skip argument 0
 	argv++;
@@ -115,6 +116,11 @@ int main(int argc, char **argv) {
 
 		if (!strcmp(*argv, "-map")) {
 			eventType = MapNotify;
+			continue;
+		}
+
+		if (!strcmp(*argv, "-print")) {
+			print = true;
 			continue;
 		}
 		break;
@@ -142,8 +148,9 @@ int main(int argc, char **argv) {
 				&& ((eventType == CreateNotify && !event.xcreatewindow.override_redirect)
 					|| (eventType == MapNotify && !event.xmap.override_redirect))) {
 			//Optionally, match window title and class
+			w = (eventType == CreateNotify) ? event.xcreatewindow.window : event.xmap.window;
 			if (title || class) {
-				if (matchExtended(dpy, event.xcreatewindow.window, class, title)) {
+				if (matchExtended(dpy, w, class, title)) {
 					break;
 				}
 				continue;
@@ -152,6 +159,9 @@ int main(int argc, char **argv) {
 		}
 	}
 
+	if(print){
+		printf("%zu", w);
+	}
 	XCloseDisplay(dpy);
 	return 0;
 }

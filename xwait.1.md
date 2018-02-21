@@ -23,6 +23,9 @@ avoid race conditions.
 
 # GENERAL OPTIONS
 
+**-print**
+:	Print the matched window ID to stdout before exiting
+
 **-map**
 :	Wait for MapNotify events instead of CreateNotify events. The MapNotify event is fired when a window is mapped to the screen to be displayed, while CreateNotify only indicates that a window exists.
 
