@@ -31,6 +31,7 @@
 #include <string.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/Xatom.h>
 
 bool matchExtended(Display* display, Window w, char* class, char* title) {
 	char* result;
@@ -76,8 +77,11 @@ int main(int argc, char **argv) {
 	Display* dpy;
 	Window root, w = 0;
 	char* title = NULL, *class = NULL;
-	int eventType = CreateNotify;
+	int eventType = CreateNotify, format = 0;
+	unsigned long items, bytes;
+	Atom pid_type, net_wm_pid;
 	bool print = false;
+	pid_t pid = 0, window_pid = 0;
 
 	//Open X11 connection
 	if (!(dpy = XOpenDisplay(NULL))) {
@@ -90,6 +94,8 @@ int main(int argc, char **argv) {
 		fprintf(stderr, "Root window could not be opened\n");
 		exit(EX_UNAVAILABLE);
 	}
+
+	net_wm_pid = XInternAtom(dpy, "_NET_WM_PID", True);
 
 	//Select which events we want to handle
    	XSelectInput(dpy, root, SubstructureNotifyMask);
@@ -128,7 +134,8 @@ int main(int argc, char **argv) {
 
 	//Execute additional program if requested
 	if (argc > 0) {
-		switch (fork()) {
+		pid = fork();
+		switch (pid) {
 			case -1:
 				perror("fork");
 				exit(EX_UNAVAILABLE);
@@ -147,8 +154,19 @@ int main(int argc, char **argv) {
 				//Ignore modal windows
 				&& ((eventType == CreateNotify && !event.xcreatewindow.override_redirect)
 					|| (eventType == MapNotify && !event.xmap.override_redirect))) {
-			//Optionally, match window title and class
 			w = (eventType == CreateNotify) ? event.xcreatewindow.window : event.xmap.window;
+			//If _NET_WM_PID supported and child pid does not match, continue
+			if (pid && net_wm_pid != None &&
+					XGetWindowProperty(dpy, w, net_wm_pid,
+					0, sizeof(window_pid) / 4, False, XA_CARDINAL,
+					&pid_type, &format, &items, &bytes,
+					(unsigned char**) &window_pid) == Success && pid_type == XA_CARDINAL){
+				if(window_pid != pid){
+					continue;
+				}
+			}
+
+			//Optionally, match window title and class
 			if (title || class) {
 				if (matchExtended(dpy, w, class, title)) {
 					break;
