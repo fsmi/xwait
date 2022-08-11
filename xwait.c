@@ -81,7 +81,8 @@ int main(int argc, char **argv) {
 	unsigned long items, bytes;
 	Atom pid_type, net_wm_pid;
 	bool print = false;
-	pid_t pid = 0, window_pid = 0;
+	bool pid_forced = false;
+	pid_t child_pid = 0, window_pid = 0, check_pid = 0;
 
 	//Open X11 connection
 	if (!(dpy = XOpenDisplay(NULL))) {
@@ -129,13 +130,21 @@ int main(int argc, char **argv) {
 			print = true;
 			continue;
 		}
+
+		if (!strcmp(*argv, "-pid")) {
+			argv++;
+			argc--;
+			check_pid = strtoul(*argv, NULL, 0);
+			pid_forced = true;
+			continue;
+		}
 		break;
 	}
 
 	//Execute additional program if requested
 	if (argc > 0) {
-		pid = fork();
-		switch (pid) {
+		child_pid = fork();
+		switch (child_pid) {
 			case -1:
 				perror("fork");
 				exit(EX_UNAVAILABLE);
@@ -143,6 +152,10 @@ int main(int argc, char **argv) {
 				execvp(argv[0], argv);
 				perror("execvp");
 				exit(EX_UNAVAILABLE);
+		}
+
+		if(!pid_forced){
+			check_pid = child_pid;
 		}
 	}
 
@@ -156,12 +169,12 @@ int main(int argc, char **argv) {
 					|| (eventType == MapNotify && !event.xmap.override_redirect))) {
 			w = (eventType == CreateNotify) ? event.xcreatewindow.window : event.xmap.window;
 			//If _NET_WM_PID supported and child pid does not match, continue
-			if (pid && net_wm_pid != None &&
+			if (check_pid && net_wm_pid != None &&
 					XGetWindowProperty(dpy, w, net_wm_pid,
 					0, sizeof(window_pid) / 4, False, XA_CARDINAL,
 					&pid_type, &format, &items, &bytes,
 					(unsigned char**) &window_pid) == Success && pid_type == XA_CARDINAL){
-				if(window_pid != pid){
+				if(window_pid != check_pid){
 					continue;
 				}
 			}

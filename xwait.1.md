@@ -26,6 +26,9 @@ avoid race conditions.
 **-print**
 :	Print the matched window ID to stdout before exiting
 
+**-pid** *PID*
+:	Override the parent PID to match for the newly created window. Overriding with `0` disables the check.
+
 **-map**
 :	Wait for MapNotify events instead of CreateNotify events. The MapNotify event is fired when a window is mapped to the screen to be displayed, while CreateNotify only indicates that a window exists.
 
